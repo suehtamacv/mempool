@@ -1,0 +1,15 @@
+*.o
+*.so
+*.log
+Bender.lock
+.bender/
+modelsim.ini
+trace_hart_*
+transcript
+vsim.wlf
+work/
+wave*
+*vstf
+wlf*
+.nfs*
+*rpt*

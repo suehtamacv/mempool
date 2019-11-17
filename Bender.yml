@@ -1,0 +1,22 @@
+package:
+  name: mempool_cluster
+
+dependencies:
+  cluster_interconnect: { git: "https://github.com/pulp-platform/cluster_interconnect.git",     rev: dev           }
+  riscv:                { git: "git@github.com:pulp-platform/riscv.git",                        rev: 4c10477241743307ebe477115594227c8c1b2d60 }
+  fpu:                  { git: "git@github.com:pulp-platform/fpnew.git",                        version: 0.6.1     }
+  tech_cells_GF22FDX:   { git: "git@iis-git.ee.ethz.ch:pulp-restricted/tech_cells_GF22FDX.git", rev: master        }
+
+sources:
+  # Level 0
+  - src/common/lfsr.sv
+  - src/common/mempool_pkg.sv
+  # Level 1
+  - src/tile/tile.sv
+  - src/tile/tile_xbar.sv
+  # Level 2
+  - src/cluster/mempool_cluster.sv
+
+  - target: mempool_test
+    files:
+      - tb/mempool_tb.sv

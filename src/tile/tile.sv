@@ -1,0 +1,202 @@
+// Copyright 2019 ETH Zurich and University of Bologna.
+// Copyright and related rights are licensed under the Solderpad Hardware
+// License, Version 0.51 (the "License"); you may not use this file except in
+// compliance with the License.  You may obtain a copy of the License at
+// http://solderpad.org/licenses/SHL-0.51. Unless required by applicable law
+// or agreed to in writing, software, hardware and materials distributed under
+// this License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+// specific language governing permissions and limitations under the License.
+
+import mempool_pkg::*;
+
+module tile (
+  // Clock and reset
+  input  logic                           clk_i            ,
+  input  logic                           rst_ni           ,
+  // Clock enable
+  input  logic                           clock_en_i       ,
+  input  logic                           test_en_i        ,
+  // Scan chain
+  input  logic                           scan_enable_i    ,
+  input  logic                           scan_data_i      ,
+  output logic                           scan_data_o      ,
+  // Boot address
+  input  logic       [             31:0] boot_addr_i      ,
+  // Tile ID
+  input  logic       [              9:0] tile_id_i        ,
+  // Debug interface
+  input  logic                           debug_req_i      ,
+  // Core data interface
+  output logic                           core_data_req_o  ,
+  output addr_t                          core_data_addr_o ,
+  output logic                           core_data_wen_o  ,
+  output data_t                          core_data_wdata_o,
+  output be_t                            core_data_be_o   ,
+  input  logic                           core_data_gnt_i  ,
+  input  logic                           core_data_vld_i  ,
+  input  data_t                          core_data_rdata_i,
+  // TCDM banks interface
+  input  logic       [BankingFactor-1:0] mem_req_i        ,
+  input  tcdm_addr_t [BankingFactor-1:0] mem_addr_i       ,
+  input  logic       [BankingFactor-1:0] mem_wen_i        ,
+  input  data_t      [BankingFactor-1:0] mem_wdata_i      ,
+  input  be_t        [BankingFactor-1:0] mem_be_i         ,
+  output data_t      [BankingFactor-1:0] mem_rdata_o      ,
+  output logic       [BankingFactor-1:0] mem_vld_o        ,
+  // CPU control signals
+  input  logic                           fetch_enable_i   ,
+  output logic                           core_busy_o
+);
+
+  /***********
+   *  CORES  *
+   ***********/
+
+  // Instruction interface
+
+  logic  core_inst_req   ;
+  logic  core_inst_gnt   ;
+  logic  core_inst_rvalid;
+  addr_t core_inst_addr  ;
+  data_t core_inst_rdata ;
+
+  // Data Interface
+  logic  core_data_req  ;
+  logic  core_data_gnt  ;
+  logic  core_data_wen  ;
+  be_t   core_data_be   ;
+  addr_t core_data_addr ;
+  data_t core_data_wdata;
+
+  riscv_core riscv_core (
+    .clk_i                                   ,
+    .rst_ni                                  ,
+    .clock_en_i                              ,
+    .test_en_i                               ,
+    .fregfile_disable_i   (1'b0             ),
+    .boot_addr_i                             ,
+    // Extract Core and Cluster ID from the tile_id
+    .core_id_i            (tile_id_i[3:0]   ),
+    .cluster_id_i         (tile_id_i[9:4]   ),
+    // Instruction interface
+    .instr_req_o          (core_inst_req    ),
+    .instr_gnt_i          (core_inst_gnt    ),
+    .instr_rvalid_i       (core_inst_rvalid ),
+    .instr_addr_o         (core_inst_addr   ),
+    .instr_rdata_i        (core_inst_rdata  ),
+    // Data interface
+    .data_req_o           (core_data_req    ),
+    .data_gnt_i           (core_data_gnt    ),
+    .data_rvalid_i        (core_data_vld_i  ),
+    .data_we_o            (core_data_wen    ),
+    .data_be_o            (core_data_be     ),
+    .data_addr_o          (core_data_addr   ),
+    .data_wdata_o         (core_data_wdata  ),
+    .data_rdata_i         (core_data_rdata_i),
+    // APU Interface
+    // Currently tied to zero
+    .apu_master_req_o     (                 ),
+    .apu_master_ready_o   (                 ),
+    .apu_master_gnt_i     ('0               ),
+    .apu_master_operands_o(                 ),
+    .apu_master_op_o      (                 ),
+    .apu_master_type_o    (                 ),
+    .apu_master_flags_o   (                 ),
+    .apu_master_valid_i   ('0               ),
+    .apu_master_result_i  ('0               ),
+    .apu_master_flags_i   ('0               ),
+    // Interruptions
+    // Currently tied to zero
+    .irq_i                ('0               ),
+    .irq_id_i             ('0               ),
+    .irq_ack_o            (                 ),
+    .irq_id_o             (                 ),
+    .irq_sec_i            ('0               ),
+    .sec_lvl_o            (                 ),
+    // Debug interface
+    .debug_req_i                             ,
+    // CPU control signals
+    .fetch_enable_i                          ,
+    .core_busy_o                             ,
+    .ext_perf_counters_i  ('0               )
+  );
+
+  /***************************
+   *  INSTRUCTION INTERFACE  *
+   ***************************/
+
+  // NOTE:
+  // For now, each core has its private instruction bank,
+  // which is initialized by the testbench at #0.
+
+  // Always ready
+  assign core_inst_gnt = core_inst_req;
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+      core_inst_rvalid <= 1'b0;
+    end else begin
+      core_inst_rvalid <= core_inst_gnt;
+    end
+  end
+
+  // TODO: Reusing TCDM Address Width
+  sram #(
+    .DATA_WIDTH(DataWidth                    ),
+    .NUM_WORDS (2**TCDMAddrMemWidth / BeWidth)
+  ) inst_bank (
+    .clk_i                                                 ,
+    .req_i  (core_inst_req                                ),
+    .we_i   (1'b0                                         ),
+    .addr_i (core_inst_addr[TCDMAddrMemWidth-1:ByteOffset]),
+    .wdata_i('0                                           ),
+    .be_i   ('0                                           ),
+    .rdata_o(core_inst_rdata                              )
+  );
+
+  /**********
+   *  TCDM  *
+   **********/
+
+  // Unused
+  assign mem_vld_o = 'x;
+
+  // Cut the requests to outside the tile
+  spill_register #(logic[$bits(addr_t)+1+$bits(be_t)+$bits(data_t)-1:0]) i_spill_register (
+    .clk_i                                                                          ,
+    .rst_ni                                                                         ,
+    .valid_i(core_data_req                                                         ),
+    .ready_o(core_data_gnt                                                         ),
+    .data_i ({core_data_addr, core_data_wen, core_data_be, core_data_wdata}        ),
+    .valid_o(core_data_req_o                                                       ),
+    .ready_i(core_data_gnt_i                                                       ),
+    .data_o ({core_data_addr_o, core_data_wen_o, core_data_be_o, core_data_wdata_o})
+  );
+
+  generate
+    for (genvar bank = 0; bank < unsigned'(BankingFactor); bank++) begin: gen_banks
+
+      data_t mem_be_int;
+      for (genvar be_byte = 0; be_byte < BeWidth; be_byte++) begin: gen_mem_be
+        assign mem_be_int[8*be_byte+:8] = {8{mem_be_i[bank][be_byte]}};
+      end : gen_mem_be
+
+
+      sram #(
+        .DATA_WIDTH(DataWidth                    ),
+        .NUM_WORDS (2**TCDMAddrMemWidth / BeWidth)
+      ) mem_bank (
+        .clk_i                                                    ,
+        .req_i  (mem_req_i[bank]                                ),
+        .we_i   (mem_wen_i[bank]                                ),
+        .addr_i (mem_addr_i[bank][TCDMAddrMemWidth-1:ByteOffset]),
+        .wdata_i(mem_wdata_i[bank]                              ),
+        .be_i   (mem_be_int                                     ),
+        .rdata_o(mem_rdata_o[bank]                              )
+      );
+
+    end : gen_banks
+   endgenerate
+
+endmodule : tile
