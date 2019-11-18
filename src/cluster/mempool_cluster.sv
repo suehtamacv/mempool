@@ -11,8 +11,7 @@
 import mempool_pkg::*;
 
 module mempool_cluster #(
-  parameter int NumCores = 256 ,
-  parameter int NumBanks = 1024
+  parameter int NumCores = 256
 ) (
   // Clock and reset
   input  logic                clk_i         ,
