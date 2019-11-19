@@ -48,50 +48,51 @@ module mempool_cluster #(
   be_t   [NumTiles-1:0][BankingFactor-1:0] tcdm_master_be ;
 
   logic       [NumTiles-1:0][BankingFactor-1:0] tcdm_slave_req ;
-  logic       [NumTiles-1:0][BankingFactor-1:0] tcdm_slave_gnt ;
   tcdm_addr_t [NumTiles-1:0][BankingFactor-1:0] tcdm_slave_addr ;
   data_t      [NumTiles-1:0][BankingFactor-1:0] tcdm_slave_rdata ;
   logic       [NumTiles-1:0][BankingFactor-1:0] tcdm_slave_wen ;
   data_t      [NumTiles-1:0][BankingFactor-1:0] tcdm_slave_wdata ;
   be_t        [NumTiles-1:0][BankingFactor-1:0] tcdm_slave_be ;
 
-  for (genvar t = 0; unsigned'(t) < NumTiles; t++) begin: gen_tiles
+  generate
+    for (genvar t = 0; unsigned'(t) < NumTiles; t++) begin: gen_tiles
 
-    tile tile (
-      .clk_i              (clk_i                ),
-      .rst_ni             (rst_ni               ),
-      .clock_en_i         (clock_en_i           ),
-      .test_en_i          (test_en_i            ),
-      .boot_addr_i        (boot_addr_i          ),
-      .scan_enable_i      (1'b0                 ),
-      .scan_data_i        (1'b0                 ),
-      .scan_data_o        (                     ),
-      // Extract Tile ID from the genvar
-      .tile_id_i          (t[9:0]               ),
-      // TCDM Master interfaces
-      .tcdm_master_req_o  (tcdm_master_req[t]   ),
-      .tcdm_master_addr_o (tcdm_master_addr[t]  ),
-      .tcdm_master_wen_o  (tcdm_master_wen[t]   ),
-      .tcdm_master_wdata_o(tcdm_master_wdata[t] ),
-      .tcdm_master_be_o   (tcdm_master_be[t]    ),
-      .tcdm_master_gnt_i  (tcdm_master_gnt[t]   ),
-      .tcdm_master_vld_i  (tcdm_master_rvalid[t]),
-      .tcdm_master_rdata_i(tcdm_master_rdata[t] ),
-      // TCDM banks interface
-      .mem_req_i          (tcdm_slave_req[t]    ),
-      .mem_addr_i         (tcdm_slave_addr[t]   ),
-      .mem_wen_i          (tcdm_slave_wen[t]    ),
-      .mem_wdata_i        (tcdm_slave_wdata[t]  ),
-      .mem_be_i           (tcdm_slave_be[t]     ),
-      .mem_rdata_o        (tcdm_slave_rdata[t]  ),
-      // Debug interface
-      .debug_req_i        (debug_req_i          ),
-      // CPU control signals
-      .fetch_enable_i     (fetch_enable_i[t]    ),
-      .core_busy_o        (core_busy_o[t]       )
-    );
+      tile tile (
+        .clk_i              ( clk_i                ),
+        .rst_ni             ( rst_ni               ),
+        .clock_en_i         ( clock_en_i           ),
+        .test_en_i          ( test_en_i            ),
+        .boot_addr_i        ( boot_addr_i          ),
+        .scan_enable_i      ( 1'b0                 ),
+        .scan_data_i        ( 1'b0                 ),
+        .scan_data_o        (                      ),
+        // Extract Tile ID from the genvar
+        .tile_id_i          ( t[9:0]               ),
+        // TCDM Master interfaces
+        .tcdm_master_req_o  ( tcdm_master_req[t]   ),
+        .tcdm_master_addr_o ( tcdm_master_addr[t]  ),
+        .tcdm_master_wen_o  ( tcdm_master_wen[t]   ),
+        .tcdm_master_wdata_o( tcdm_master_wdata[t] ),
+        .tcdm_master_be_o   ( tcdm_master_be[t]    ),
+        .tcdm_master_gnt_i  ( tcdm_master_gnt[t]   ),
+        .tcdm_master_vld_i  ( tcdm_master_rvalid[t]),
+        .tcdm_master_rdata_i( tcdm_master_rdata[t] ),
+        // TCDM banks interface
+        .mem_req_i          ( tcdm_slave_req[t]    ),
+        .mem_addr_i         ( tcdm_slave_addr[t]   ),
+        .mem_wen_i          ( tcdm_slave_wen[t]    ),
+        .mem_wdata_i        ( tcdm_slave_wdata[t]  ),
+        .mem_be_i           ( tcdm_slave_be[t]     ),
+        .mem_rdata_o        ( tcdm_slave_rdata[t]  ),
+        // Debug interface
+        .debug_req_i        ( debug_req_i          ),
+        // CPU control signals
+        .fetch_enable_i     ( fetch_enable_i[t]    ),
+        .core_busy_o        ( core_busy_o[t]       )
+      );
 
-  end : gen_tiles
+    end : gen_tiles
+  endgenerate
 
   /***********************
    *  TCDM INTERCONNECT  *
@@ -107,7 +108,6 @@ module mempool_cluster #(
   be_t   [BankingFactor-1:0][NumTiles-1:0] tcdm_master_int_be ;
 
   logic       [BankingFactor-1:0][NumTiles-1:0] tcdm_slave_int_req ;
-  logic       [BankingFactor-1:0][NumTiles-1:0] tcdm_slave_int_gnt ;
   tcdm_addr_t [BankingFactor-1:0][NumTiles-1:0] tcdm_slave_int_addr ;
   data_t      [BankingFactor-1:0][NumTiles-1:0] tcdm_slave_int_rdata ;
   logic       [BankingFactor-1:0][NumTiles-1:0] tcdm_slave_int_wen ;
@@ -130,7 +130,6 @@ module mempool_cluster #(
 
         // Slave ports
         tcdm_slave_req      [t][b] = tcdm_slave_int_req  [b][t];
-        tcdm_slave_int_gnt  [b][t] = tcdm_slave_gnt      [t][b];
         tcdm_slave_addr     [t][b] = tcdm_slave_int_addr [b][t];
         tcdm_slave_int_rdata[b][t] = tcdm_slave_rdata    [t][b];
         tcdm_slave_wen      [t][b] = tcdm_slave_int_wen  [b][t];
@@ -165,7 +164,7 @@ module mempool_cluster #(
         .vld_o  (tcdm_master_int_rvalid[b]),
         .rdata_o(tcdm_master_int_rdata[b] ),
         .req_o  (tcdm_slave_int_req[b]    ),
-        .gnt_i  (tcdm_slave_int_gnt[b]    ),
+        .gnt_i  (tcdm_slave_int_req[b]    ), // Always grant the requests
         .add_o  (tcdm_slave_int_addr[b]   ),
         .wen_o  (tcdm_slave_int_wen[b]    ),
         .wdata_o(tcdm_slave_int_wdata[b]  ),
@@ -185,6 +184,6 @@ module mempool_cluster #(
     core_cnt: assert (NumTiles <= 1024) else
       $fatal(1, "MemPool is currently limited to 1024 cores.");
   end
-  // pragma translate_on
+// pragma translate_on
 
 endmodule : mempool_cluster

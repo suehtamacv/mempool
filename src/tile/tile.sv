@@ -169,10 +169,10 @@ module tile (
     // Multiplex request depending on the address of the request
     automatic int unsigned bank = BankingFactor == 1 ? 0 : core_data_addr[ByteOffset +: $clog2(BankingFactor)];
     tcdm_master_req             = '0;
-    tcdm_master_req[bank]       = core_data_req;
+    tcdm_master_req[bank] = core_data_req;
 
     // Or-reduce the grants
-    core_data_gnt               = |tcdm_master_gnt;
+    core_data_gnt = |tcdm_master_gnt;
   end
 
   generate
