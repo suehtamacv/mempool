@@ -57,78 +57,18 @@ module mempool_cluster #(
 
   for (genvar t = 0; unsigned'(t) < NumTiles; t++) begin: gen_tiles
 
-    logic core_data_req   ;
-    addr_t core_data_addr ;
-    logic core_data_wen   ;
-    data_t core_data_wdata;
-    be_t core_data_be     ;
-    logic core_data_gnt   ;
-    logic core_data_vld   ;
-    data_t core_data_rdata;
-
-    logic       [BankingFactor-1:0] mem_req   ;
-    tcdm_addr_t [BankingFactor-1:0] mem_addr  ;
-    logic       [BankingFactor-1:0] mem_wen   ;
-    data_t      [BankingFactor-1:0] mem_wdata ;
-    be_t        [BankingFactor-1:0] mem_be    ;
-    data_t      [BankingFactor-1:0] mem_rdata ;
-    logic       [BankingFactor-1:0] mem_vld   ;
-
     tile tile (
-      .clk_i            ( clk_i            ),
-      .rst_ni           ( rst_ni           ),
-      .clock_en_i       ( clock_en_i       ),
-      .test_en_i        ( test_en_i        ),
-      .boot_addr_i      ( boot_addr_i      ),
-      .scan_enable_i    ( 1'b0             ),
-      .scan_data_i      ( 1'b0             ),
-      .scan_data_o      (                  ),
-      // Extract Tile ID from the genvar
-      .tile_id_i        ( t[9:0]           ),
-      // Core data interface
-      .core_data_req_o  ( core_data_req    ),
-      .core_data_addr_o ( core_data_addr   ),
-      .core_data_wen_o  ( core_data_wen    ),
-      .core_data_wdata_o( core_data_wdata  ),
-      .core_data_be_o   ( core_data_be     ),
-      .core_data_gnt_i  ( core_data_gnt    ),
-      .core_data_vld_i  ( core_data_vld    ),
-      .core_data_rdata_i( core_data_rdata  ),
-      // TCDM banks interface
-      .mem_req_i        ( mem_req          ),
-      .mem_addr_i       ( mem_addr         ),
-      .mem_wen_i        ( mem_wen          ),
-      .mem_wdata_i      ( mem_wdata        ),
-      .mem_be_i         ( mem_be           ),
-      .mem_rdata_o      ( mem_rdata        ),
-      .mem_vld_o        ( mem_vld          ),
-      // Debug interface
-      .debug_req_i      ( debug_req_i      ),
-      // CPU control signals
-      .fetch_enable_i   ( fetch_enable_i[t]),
-      .core_busy_o      ( core_busy_o[t]   )
-    );
-
-    tile_xbar local_xbar (
       .clk_i              (clk_i                ),
       .rst_ni             (rst_ni               ),
-      // Core data interface
-      .core_data_req_i    (core_data_req        ),
-      .core_data_addr_i   (core_data_addr       ),
-      .core_data_wen_i    (core_data_wen        ),
-      .core_data_wdata_i  (core_data_wdata      ),
-      .core_data_be_i     (core_data_be         ),
-      .core_data_gnt_o    (core_data_gnt        ),
-      .core_data_vld_o    (core_data_vld        ),
-      .core_data_rdata_o  (core_data_rdata      ),
-      // TCDM banks interface
-      .mem_req_o          (mem_req              ),
-      .mem_addr_o         (mem_addr             ),
-      .mem_wen_o          (mem_wen              ),
-      .mem_wdata_o        (mem_wdata            ),
-      .mem_be_o           (mem_be               ),
-      .mem_rdata_i        (mem_rdata            ),
-      // TCDM Interconnect master interface
+      .clock_en_i         (clock_en_i           ),
+      .test_en_i          (test_en_i            ),
+      .boot_addr_i        (boot_addr_i          ),
+      .scan_enable_i      (1'b0                 ),
+      .scan_data_i        (1'b0                 ),
+      .scan_data_o        (                     ),
+      // Extract Tile ID from the genvar
+      .tile_id_i          (t[9:0]               ),
+      // TCDM Master interfaces
       .tcdm_master_req_o  (tcdm_master_req[t]   ),
       .tcdm_master_addr_o (tcdm_master_addr[t]  ),
       .tcdm_master_wen_o  (tcdm_master_wen[t]   ),
@@ -137,14 +77,18 @@ module mempool_cluster #(
       .tcdm_master_gnt_i  (tcdm_master_gnt[t]   ),
       .tcdm_master_vld_i  (tcdm_master_rvalid[t]),
       .tcdm_master_rdata_i(tcdm_master_rdata[t] ),
-      // Interface with the TCDM interconnect
-      .tcdm_slave_req_i   (tcdm_slave_req[t]    ),
-      .tcdm_slave_addr_i  (tcdm_slave_addr[t]   ),
-      .tcdm_slave_wen_i   (tcdm_slave_wen[t]    ),
-      .tcdm_slave_wdata_i (tcdm_slave_wdata[t]  ),
-      .tcdm_slave_be_i    (tcdm_slave_be[t]     ),
-      .tcdm_slave_gnt_o   (tcdm_slave_gnt[t]    ),
-      .tcdm_slave_rdata_o (tcdm_slave_rdata[t]  )
+      // TCDM banks interface
+      .mem_req_i          (tcdm_slave_req[t]    ),
+      .mem_addr_i         (tcdm_slave_addr[t]   ),
+      .mem_wen_i          (tcdm_slave_wen[t]    ),
+      .mem_wdata_i        (tcdm_slave_wdata[t]  ),
+      .mem_be_i           (tcdm_slave_be[t]     ),
+      .mem_rdata_o        (tcdm_slave_rdata[t]  ),
+      // Debug interface
+      .debug_req_i        (debug_req_i          ),
+      // CPU control signals
+      .fetch_enable_i     (fetch_enable_i[t]    ),
+      .core_busy_o        (core_busy_o[t]       )
     );
 
   end : gen_tiles
@@ -235,12 +179,12 @@ module mempool_cluster #(
   /****************
    *  ASSERTIONS  *
    ****************/
-  
+
   // pragma translate_off
   initial begin
     core_cnt: assert (NumTiles <= 1024) else
       $fatal(1, "MemPool is currently limited to 1024 cores.");
   end
   // pragma translate_on
-  
+
 endmodule : mempool_cluster

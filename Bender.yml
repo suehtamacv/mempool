@@ -13,7 +13,6 @@ sources:
   - src/common/mempool_pkg.sv
   # Level 1
   - src/tile/tile.sv
-  - src/tile/tile_xbar.sv
   # Level 2
   - src/cluster/mempool_cluster.sv
 
